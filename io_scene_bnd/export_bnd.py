@@ -267,10 +267,9 @@ def export_terrain_bound(file, ob):
     
     # write index info
     tot_ind = 0
-    file.write(struct.pack('H', 0))
-    for i in range(total_sections-1):
-      tot_ind += len(section_groups[i])
+    for i in range(total_sections):
       file.write(struct.pack('H', tot_ind))
+      tot_ind += len(section_groups[i])
 
     for i in range(total_sections):
       file.write(struct.pack('H', len(section_groups[i])))
