@@ -419,8 +419,9 @@ def save(operator,
     
     # set object modes
     for ob in context.scene.objects:
-      context.scene.objects.active = ob
-      bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
+      if ob.type == 'MESH':
+        context.scene.objects.active = ob
+        bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
     
     # set globals
     global apply_modifiers_G
