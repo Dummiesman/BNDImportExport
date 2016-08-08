@@ -77,13 +77,20 @@ def read_bnd_file(file):
         
         # create face
         if num_indices == 4:
-          face = bm.faces.new((bm.verts[int(cmps[1])], bm.verts[int(cmps[2])], bm.verts[int(cmps[3])], bm.verts[int(cmps[4])]))
+          try:
+            face = bm.faces.new((bm.verts[int(cmps[1])], bm.verts[int(cmps[2])], bm.verts[int(cmps[3])], bm.verts[int(cmps[4])]))
+          except Exception as e:
+            print(str(e))
         if num_indices == 3:
-          face = bm.faces.new((bm.verts[int(cmps[1])], bm.verts[int(cmps[2])], bm.verts[int(cmps[3])]))
+          try:
+            face = bm.faces.new((bm.verts[int(cmps[1])], bm.verts[int(cmps[2])], bm.verts[int(cmps[3])]))
+          except Exception as e:
+            print(str(e))
         
         # set smooth/material
-        face.material_index = int(cmps[num_indices+1])
-        face.smooth = True
+        if face is not None:
+          face.material_index = int(cmps[num_indices+1])
+          face.smooth = True
     
     # calculate normals
     bm.normal_update()
