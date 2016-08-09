@@ -418,9 +418,11 @@ def save(operator,
     
     # set object modes
     for ob in context.scene.objects:
-      if ob.type == 'MESH':
+      if ob.type == 'MESH' and ob.name.lower() == "bound" and not ob.hide:
         context.scene.objects.active = ob
         bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
+      if ob.name.lower() == "bound" and (ob.hide or ob.type != 'MESH'):
+        raise Exception("BOUND has invalid object type, or is not visible in the scene")
     
     # set globals
     global apply_modifiers_G
