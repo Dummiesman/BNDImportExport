@@ -11,7 +11,7 @@ bl_info = {
     "name": "Angel Studios BND/BBND/TER Format",
     "author": "Dummiesman",
     "version": (0, 0, 1),
-    "blender": (2, 76, 0),
+    "blender": (2, 77, 0),
     "location": "File > Import-Export",
     "description": "Import-Export BND files",
     "warning": "",

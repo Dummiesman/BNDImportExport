@@ -11,7 +11,6 @@ import os, time, struct, math, sys
 import os.path as path
 
 import bpy, bmesh, mathutils
-from mathutils.bvhtree import BVHTree
 
 # globals
 global apply_modifiers_G
