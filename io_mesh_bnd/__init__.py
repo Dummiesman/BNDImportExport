@@ -1,22 +1,22 @@
 # ##### BEGIN LICENSE BLOCK #####
 #
-# This program is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 3.0
+# This program is licensed under Creative Commons BY-NC-SA:
 # https://creativecommons.org/licenses/by-nc-sa/3.0/
 #
-# Copyright (C) Dummiesman, 2016
+# Created by Dummiesman, 2016-2020
 #
 # ##### END LICENSE BLOCK #####
 
 bl_info = {
     "name": "Angel Studios BND/BBND/TER Format",
     "author": "Dummiesman",
-    "version": (0, 0, 1),
-    "blender": (2, 77, 0),
+    "version": (0, 0, 2),
+    "blender": (2, 83, 0),
     "location": "File > Import-Export",
     "description": "Import-Export BND files",
     "warning": "",
-    "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.7/Py/"
-                "Scripts/Import-Export/BND",
+    "doc_url": "https://github.com/Dummiesman/BNDImportExport/",
+    "tracker_url": "https://github.com/Dummiesman/BNDImportExport/",
     "support": 'COMMUNITY',
     "category": "Import-Export"}
 
@@ -40,7 +40,7 @@ class ImportBND(bpy.types.Operator, ImportHelper):
     bl_options = {'UNDO'}
 
     filename_ext = ".bnd"
-    filter_glob = StringProperty(default="*.bnd", options={'HIDDEN'})
+    filter_glob: StringProperty(default="*.bnd", options={'HIDDEN'})
 
     def execute(self, context):
         from . import import_bnd
@@ -59,24 +59,24 @@ class ExportBND(bpy.types.Operator, ExportHelper):
     bl_label = 'Export BND'
 
     filename_ext = ".bnd"
-    filter_glob = StringProperty(
+    filter_glob: StringProperty(
             default="*.bnd",
             options={'HIDDEN'},
             )
 
-    export_binary = BoolProperty(
+    export_binary: BoolProperty(
         name="Export Binary Bound",
         description="Export a binary bound along the ASCII bound",
         default=False,
         )
         
-    export_terrain = BoolProperty(
-        name="Export Terrain Bound",
-        description="Export a terrain bound along the binary bound",
-        default=False,
-        )
+    #export_terrain: BoolProperty(
+    #    name="Export Terrain Bound",
+    #    description="Export a terrain bound along the binary bound",
+    #    default=False,
+    #    )
 
-    apply_modifiers = BoolProperty(
+    apply_modifiers: BoolProperty(
         name="Apply Modifiers",
         description="Do you desire modifiers to be applied in the PKG?",
         default=True,
@@ -86,9 +86,9 @@ class ExportBND(bpy.types.Operator, ExportHelper):
         layout = self.layout
         sub = layout.row()
         sub.prop(self, "export_binary")
-        sub = layout.row()
-        sub.enabled = self.export_binary
-        sub.prop(self, "export_terrain")
+        #sub = layout.row()
+        #sub.enabled = self.export_binary
+        #sub.prop(self, "export_terrain")
         sub = layout.row()
         sub.prop(self, "apply_modifiers")
         
@@ -113,18 +113,26 @@ def menu_func_import(self, context):
     self.layout.operator(ImportBND.bl_idname, text="Angel Studios Bound (.bnd)")
 
 
-def register():
-    bpy.utils.register_module(__name__)
+# Register factories
+classes = (
+    ImportBND,
+    ExportBND
+)
 
-    bpy.types.INFO_MT_file_import.append(menu_func_import)
-    bpy.types.INFO_MT_file_export.append(menu_func_export)
+def register():
+    for cls in classes:
+        bpy.utils.register_class(cls)
+
+    bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
+    bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
 
 
 def unregister():
-    bpy.utils.unregister_module(__name__)
-
-    bpy.types.INFO_MT_file_import.remove(menu_func_import)
-    bpy.types.INFO_MT_file_export.remove(menu_func_export)
+    bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
+    bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
+    
+    for cls in reversed(classes):
+        bpy.utils.unregister_class(cls)
 
 if __name__ == "__main__":
     register()

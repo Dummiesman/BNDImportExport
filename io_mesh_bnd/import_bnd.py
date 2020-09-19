@@ -3,7 +3,7 @@
 # This program is licensed under Creative Commons BY-NC-SA:
 # https://creativecommons.org/licenses/by-nc-sa/3.0/
 #
-# Copyright (C) Dummiesman, 2016
+# Created by Dummiesman, 2016-2020
 #
 # ##### END LICENSE BLOCK #####
 
@@ -12,15 +12,15 @@ import time
 
 # material color list
 material_colors = {
-                    'grass': (0, 0.507, 0.005),
-                    'cobblestone': (0.040, 0.040, 0.040),
-                    'default': (1, 1, 1),
-                    'wood': (0.545, 0.27, 0.074),
-                    'dirt': (0.545, 0.35, 0.168),
-                    'mud': (0.345, 0.25, 0.068),
-                    'sand': (1, 0.78, 0.427),
-                    'water': (0.20, 0.458, 0.509),
-                    'deepwater': (0.15, 0.408, 0.459),
+                    'grass': (0, 0.507, 0.005, 1.0),
+                    'cobblestone': (0.040, 0.040, 0.040, 1.0),
+                    'default': (1, 1, 1, 1.0),
+                    'wood': (0.545, 0.27, 0.074, 1.0),
+                    'dirt': (0.545, 0.35, 0.168, 1.0),
+                    'mud': (0.345, 0.25, 0.068, 1.0),
+                    'sand': (1, 0.78, 0.427, 1.0),
+                    'water': (0.20, 0.458, 0.509, 1.0),
+                    'deepwater': (0.15, 0.408, 0.459, 1.0),
                   }
 
 ######################################################
@@ -34,10 +34,30 @@ def create_material(name):
     if name_l in material_colors:
       material_color = material_colors[name_l]
       
-    #setup material
+    # setup material
     mtl = bpy.data.materials.new(name=name_l)
     mtl.diffuse_color = material_color
     mtl.specular_intensity = 0
+    
+    mtl.use_nodes = True
+    mtl.use_backface_culling = True
+    
+    # get output node
+    output_node = None
+    for node in mtl.node_tree.nodes:
+        if node.type == "OUTPUT_MATERIAL":
+            output_node = node
+            break
+    
+    # clear principled, put diffuse in it's place
+    bsdf = mtl.node_tree.nodes["Principled BSDF"]
+    mtl.node_tree.nodes.remove(bsdf)
+    
+    bsdf = mtl.node_tree.nodes.new(type='ShaderNodeBsdfDiffuse')
+    mtl.node_tree.links.new( bsdf.outputs['BSDF'], output_node.inputs['Surface'] )
+    
+    # setup bsdf
+    bsdf.inputs["Color"].default_value = material_color
     
     return mtl
     
@@ -50,8 +70,8 @@ def read_bnd_file(file):
     bm = bmesh.new()
     bm.from_mesh(me)
     
-    scn.objects.link(ob)
-    scn.objects.active = ob
+    scn.collection.objects.link(ob)
+    bpy.context.view_layer.objects.active = ob
     
     bpy.ops.object.mode_set(mode='EDIT', toggle=False)
     

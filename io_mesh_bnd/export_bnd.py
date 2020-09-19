@@ -166,129 +166,16 @@ def poly_debug(poly1, color=(0,0,0)):
 ######################################################
 # EXPORT MAIN FILES
 ######################################################
-def export_terrain_bound(file, ob):
-    # create temp mesh
-    temp_mesh = ob.to_mesh(bpy.context.scene, apply_modifiers_G, 'PREVIEW')
-    
-    # get bmesh
-    bm = bmesh.new()
-    bm.from_mesh(temp_mesh)
-    bm.verts.ensure_lookup_table()
-    bm.faces.index_update()
-    
-    # header
-    file.write(struct.pack('f', 1.1))
-    file.write(struct.pack('LLB', len(bm.faces), 0, 0))
-    
-    # boundbox
-    bnds = bounds(ob)
-    bnd_width = math.fabs(bnds.x.max - bnds.x.min)
-    bnd_height = math.fabs(bnds.z.max - bnds.z.min)
-    bnd_depth = math.fabs(bnds.y.max - bnds.y.min)
-    
-    file.write(struct.pack('fff', bnd_width, bnd_height, bnd_depth))
-    
-    # section data  
-    width_sections = max(1, math.ceil(bnd_width / 10))
-    depth_sections = max(1, math.ceil(bnd_depth / 10))
-    height_sections = 1
-    
-    total_sections = width_sections * depth_sections
-    individual_section_width = (1/(width_sections/bnd_width))/2
-    individual_section_depth = (1/(depth_sections/bnd_depth))/2
-    
-    file.write(struct.pack('LLLL', width_sections, height_sections, depth_sections, total_sections))
-    
-    #calculate intersecting polygons + poly indices
-    poly_indices = 0
-    section_groups = []
-    
-    for d in range(depth_sections):
-      for w in range(width_sections):
-        section_group = []
-        section_center = [lerp(bnds.x.min, bnds.x.max, (w)/width_sections) +  (individual_section_width /2), lerp(bnds.y.max, bnds.y.min, (d)/depth_sections) - (individual_section_depth/2)]
-        section_center[0] += individual_section_width/2
-        section_center[1] -= individual_section_depth/2
-        section_tl = (section_center[0] - (individual_section_width * 1.5), section_center[1] - (individual_section_depth * 1.5))
-        section_br = (section_center[0] + (individual_section_width * 1.5), section_center[1] + (individual_section_depth * 1.5))
-        section_poly = [(section_tl[0], section_tl[1]), (section_br[0], section_tl[1]), (section_br[0], section_br[1]), (section_tl[0], section_br[1])]
-          
-        for f in bm.faces:
-          # construct face poly 2d
-          face_poly = []
-          for l in f.loops:
-            face_poly.append((bm.verts[l.vert.index].co[0],bm.verts[l.vert.index].co[1]))
-          
-          # test with edge intersection
-          ovr_rslt = poly_overlap_test(face_poly, section_poly, max(individual_section_width, individual_section_depth) * (f.calc_area() / 40))
-          
-          # vertices within poly test
-          if not ovr_rslt:
-            for v in face_poly:
-              if point_in_box(v, section_poly):
-                ovr_rslt = True
-          
-          # polygon contains sector?
-          if not ovr_rslt:
-            for p in section_poly:
-              if not ovr_rslt:
-                ovr_rslt = point_in_polygon(p, face_poly)
-          
-          # contains center?
-          if not ovr_rslt:
-            p_ctr = f.calc_center_median()
-            p_ctr_2d = (p_ctr[0], p_ctr[1])
-            if point_in_polygon(p_ctr_2d, section_poly):
-              ovr_result = True
-            
-          if ovr_rslt == True:
-            section_group.append(f.index)
-            poly_indices += 1
-        
-        section_groups.append(section_group)
-        
-    # continue writing more binary information about boxes and stuff
-    file.write(struct.pack('L', poly_indices))
-    
-    if bnd_width == 0:
-      file.write(struct.pack('f', float('Inf')))
-    else:
-      file.write(struct.pack('f', width_sections / bnd_width))
-      
-    file.write(struct.pack('f', 1))
-      
-    if bnd_depth == 0:
-      file.write(struct.pack('f', float('Inf')))
-    else:
-      file.write(struct.pack('f', depth_sections / bnd_depth))
-      
-    file.write(struct.pack('ffffff',  bnds.x.min, bnds.z.min, bnds.y.min, bnds.x.max, bnds.z.max ,bnds.y.max))
-    
-    # write index info
-    tot_ind = 0
-    for i in range(total_sections):
-      file.write(struct.pack('H', tot_ind))
-      tot_ind += len(section_groups[i])
-
-    for i in range(total_sections):
-      file.write(struct.pack('H', len(section_groups[i])))
-      
-    for i in range(total_sections):
-      for j in range(len(section_groups[i])):
-          file.write(struct.pack('H', section_groups[i][j]))
-      
-        
-    # finish off
-    bpy.data.meshes.remove(temp_mesh)
-    bm.free()
-    file.close()
-    return
-
-
 def export_binary_bound(file, ob):
     # create temp mesh
-    temp_mesh = ob.to_mesh(bpy.context.scene, apply_modifiers_G, 'PREVIEW')
-    
+    temp_mesh = None
+    if apply_modifiers_G:
+        dg = bpy.context.evaluated_depsgraph_get()
+        eval_obj = ob.evaluated_get(dg)
+        temp_mesh = eval_obj.to_mesh()
+    else:
+        temp_mesh = ob.to_mesh()
+        
     # get bmesh
     bm = bmesh.new()
     bm.from_mesh(temp_mesh)
@@ -320,7 +207,6 @@ def export_binary_bound(file, ob):
             file.write(struct.pack('HHHHH', fcs.loops[0].vert.index, fcs.loops[1].vert.index, fcs.loops[2].vert.index, fcs.loops[3].vert.index, fcs.material_index))
     
     # finish off
-    bpy.data.meshes.remove(temp_mesh)
     bm.free()
     file.close()
     return
@@ -328,7 +214,13 @@ def export_binary_bound(file, ob):
 
 def export_bound(file, ob):
     # create temp mesh
-    temp_mesh = ob.to_mesh(bpy.context.scene, apply_modifiers_G, 'PREVIEW')
+    temp_mesh = None
+    if apply_modifiers_G:
+        dg = bpy.context.evaluated_depsgraph_get()
+        eval_obj = ob.evaluated_get(dg)
+        temp_mesh = eval_obj.to_mesh()
+    else:
+        temp_mesh = ob.to_mesh()
     
     # get bmesh
     bm = bmesh.new()
@@ -362,7 +254,6 @@ def export_bound(file, ob):
     file.write(bnd_file)
 
     # finish off
-    bpy.data.meshes.remove(temp_mesh)
     bm.free()
     file.close()
     return
@@ -373,7 +264,6 @@ def export_bound(file, ob):
 ######################################################
 def save_bnd(filepath,
              export_binary,
-             export_terrain,
              context):
 
     print("exporting BOUND: %r..." % (filepath))
@@ -398,10 +288,10 @@ def save_bnd(filepath,
       binfile = open(filepath[:-3] + "bbnd", 'wb')
       export_binary_bound(binfile, bound_obj)
     
-    if export_terrain:
-      # write TER
-      terfile = open(filepath[:-3] + "ter", 'wb')
-      export_terrain_bound(terfile, bound_obj)
+    #if export_terrain:
+    #  # write TER
+    #  terfile = open(filepath[:-3] + "ter", 'wb')
+    #  export_terrain_bound(terfile, bound_obj)
       
     # bound export complete
     print(" done in %.4f sec." % (time.clock() - time1))
@@ -411,16 +301,15 @@ def save(operator,
          context,
          filepath="",
          export_binary=False,
-         export_terrain=False,
          apply_modifiers=False
          ):
     
     # set object modes
     for ob in context.scene.objects:
-      if ob.type == 'MESH' and ob.name.lower() == "bound" and not ob.hide:
-        context.scene.objects.active = ob
+      if ob.type == 'MESH' and ob.name.lower() == "bound":
+        context.view_layer.objects.active = ob
         bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
-      if ob.name.lower() == "bound" and (ob.hide or ob.type != 'MESH'):
+      elif ob.name.lower() == "bound" and ob.type != 'MESH':
         raise Exception("BOUND has invalid object type, or is not visible in the scene")
     
     # set globals
@@ -430,7 +319,6 @@ def save(operator,
     # save BND
     save_bnd(filepath,
              export_binary,
-             export_terrain,
              context,
              )
 
