@@ -87,7 +87,7 @@ def read_bnd_file(file):
       # not an empty line, read it!
       if cmps[0] == "v":
         # vertex
-        bm.verts.new((float(cmps[1]), float(cmps[3]) * -1, float(cmps[2])))
+        bm.verts.new((float(cmps[1]) * -1, float(cmps[3]), float(cmps[2])))
         bm.verts.ensure_lookup_table()
       elif cmps[0] == "mtl":
         # material

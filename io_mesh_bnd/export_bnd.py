@@ -181,6 +181,7 @@ def make_ascii_material(name):
 def export_binary_bound(file, ob):
     # create temp mesh
     temp_mesh = None
+    global apply_modifiers_G
     if apply_modifiers_G:
         dg = bpy.context.evaluated_depsgraph_get()
         eval_obj = ob.evaluated_get(dg)
@@ -198,7 +199,7 @@ def export_binary_bound(file, ob):
     
     # vertices
     for v in bm.verts:
-        file.write(struct.pack('fff', v.co[0], v.co[2], v.co[1] * -1))
+        file.write(struct.pack('fff', v.co[0] * -1, v.co[2], v.co[1]))
 
     # materials
     num_materials = len(ob.material_slots)
@@ -243,7 +244,7 @@ def export_bound(file, ob):
 
     # vertices
     for v in bm.verts:
-        bnd_file += "v " + "{0:.6f}".format(v.co[0]) + " " + "{0:.6f}".format(v.co[2]) + " " + "{0:.6f}".format(v.co[1] * -1) + "\n"
+        bnd_file += "v " + "{0:.6f}".format(v.co[0] * -1) + " " + "{0:.6f}".format(v.co[2]) + " " + "{0:.6f}".format(v.co[1]) + "\n"
 
     bnd_file += "\n"
 
