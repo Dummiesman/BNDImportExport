@@ -70,11 +70,11 @@ class ExportBND(bpy.types.Operator, ExportHelper):
         default=False,
         )
         
-    #export_terrain: BoolProperty(
-    #    name="Export Terrain Bound",
-    #    description="Export a terrain bound along the binary bound",
-    #    default=False,
-    #    )
+    export_terrain: BoolProperty(
+        name="Export Terrain Bound",
+        description="Export a terrain bound along the binary bound",
+        default=False,
+        )
 
     apply_modifiers: BoolProperty(
         name="Apply Modifiers",
@@ -86,9 +86,9 @@ class ExportBND(bpy.types.Operator, ExportHelper):
         layout = self.layout
         sub = layout.row()
         sub.prop(self, "export_binary")
-        #sub = layout.row()
-        #sub.enabled = self.export_binary
-        #sub.prop(self, "export_terrain")
+        sub = layout.row()
+        sub.enabled = self.export_binary
+        sub.prop(self, "export_terrain")
         sub = layout.row()
         sub.prop(self, "apply_modifiers")
         

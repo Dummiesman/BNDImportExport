@@ -91,77 +91,24 @@ def point_in_box(point, box):
     return True
   return False
   
-  
 def point_in_polygon(p, vertices):
-    # If the point is a vertex, it's in the polygon
-    if tuple(p) in (tuple(i) for i in vertices):
-        return True
+    n = len(vertices)
+    inside =False
 
-    xs = [i[0] for i in vertices]
-    ys = [i[1] for i in vertices]
-    # if the point is outside of the polygon's bounding
-    # box, it's not in the polygon
-    if (p[0] > max(*xs) or p[0] < min(*xs)) or (p[1] > max(*ys) or p[1] < min(*ys)):
-        return False
+    x, y = p
+    p1x,p1y = vertices[0]
+    for i in range(n+1):
+        p2x,p2y = vertices[i % n]
+        if y > min(p1y,p2y):
+            if y <= max(p1y,p2y):
+                if x <= max(p1x,p2x):
+                    if p1y != p2y:
+                        xinters = (y-p1y)*(p2x-p1x)/float((p2y-p1y))+p1x
+                    if p1x == p2x or x <= xinters:
+                        inside = not inside
+        p1x,p1y = p2x,p2y
 
-    p1 = vertices[-1] # Start with first and last vertices
-    count = 0
-    for p2 in vertices:
-        # Check if point is between lines y=p1[1] and y=p2[1]
-        if p[1] <= max(p1[1], p2[1]) and p[1] >= min(p1[1], p2[1]):
-            # Get the intersection with the line that passes
-            # through p1 and p2
-            xdiv1 = float(p2[0]-p1[0])*float(p[1]-p1[1])
-            xdiv2 = float(p2[1]-p1[1])+p1[0]
-            
-            if xdiv2 > 0:
-              x_inters = xdiv1/xdiv2
-
-              # If p[0] is less than or equal to x_inters,
-              # we have an intersection
-              if p[0] <= x_inters:
-                  count += 1
-        p1 = p2
-
-    # If the intersections are even, the point is outside of
-    # the polygon.
-    return count % 2 != 0
-    
- 
-def poly_debug(poly1, color=(0,0,0)):
-  # sample data
-  coords = []
-  for c in poly1:
-    coords.append((c[0], c[1], 0))
-
-  # create the Curve Datablock
-  curveData = bpy.data.curves.new('poly_debug', type='CURVE')
-  curveData.dimensions = '3D'
-
-  # map coords to spline
-  polyline = curveData.splines.new('POLY')
-  polyline.points.add(len(coords) - 1)
-  for i in range(len(coords)):
-      x,y,z = coords[i]
-      polyline.points[i].co = (x, y, z, 1)
-  
-  polyline.use_cyclic_u = True 
-  
-  # create Object
-  curveOB = bpy.data.objects.new('poly_debug', curveData)
-  curveData.bevel_depth = 0.05
-  
-  # apply material
-  mat = bpy.data.materials.new(name="polydebug")
-  mat.diffuse_color = color
-  mat.use_shadeless = True
-  mat.use_object_color = True
-  curveOB.data.materials.append(mat)
-  
-  # attach to scene and validate context
-  scn = bpy.context.scene
-  scn.objects.link(curveOB)
-  return curveOB
+    return inside
 
 
 def write_binary_material(file, name):
@@ -175,9 +122,188 @@ def make_ascii_material(name):
     return "mtl " + name + " {\n\telasticity: 0.100000\n\tfriction: 0.500000\n\teffect: none\n\tsound: none\n}\n"
 
 
+def point_in_bounds(bmin, bmax, p):
+    return p[0] >= bmin[0] and p[1] >= bmin[1] and p[0] <= bmax[0] and p[1] <= bmax[1]
+
+    
+def edges_intersect(p1, p2, p3, p4):
+    #https://stackoverflow.com/a/24392281
+    #returns true if the line from (a,b)->(c,d) intersects with (p,q)->(r,s)
+    a = p1[0]
+    b = p1[1]
+    c = p2[0]
+    d = p2[1]
+    p = p3[0]
+    q = p3[1]
+    r = p4[0]
+    s = p4[1]
+    
+    det = (c - a) * (s - q) - (r - p) * (d - b);
+    if abs(det) < 0.001:
+      return False
+    else:
+      lmbda = ((s - q) * (r - a) + (p - r) * (s - b)) / det
+      gamma = ((b - d) * (r - a) + (c - a) * (s - b)) / det
+      return (0 < lmbda and lmbda < 1) and (0 < gamma and gamma < 1)
+      
+def bounds_intersect(amin, amax, bmin, bmax):
+    return amin[0] <= bmax[0] and amax[0] >= bmin[0] and amin[1] <= bmax[1] and amax[1] >= bmin[1]
+
+
 ######################################################
 # EXPORT MAIN FILES
 ######################################################
+def export_terrain_bound(file, ob):
+    # create temp mesh
+    temp_mesh = None
+    global apply_modifiers_G
+    if apply_modifiers_G:
+        dg = bpy.context.evaluated_depsgraph_get()
+        eval_obj = ob.evaluated_get(dg)
+        temp_mesh = eval_obj.to_mesh()
+    else:
+        temp_mesh = ob.to_mesh()
+    
+    # get bmesh
+    bm = bmesh.new()
+    bm.from_mesh(temp_mesh)
+    bm.verts.ensure_lookup_table()
+    bm.faces.index_update()
+    
+    # header
+    file.write(struct.pack('f', 1.1))
+    file.write(struct.pack('LLB', len(bm.faces), 0, 0))
+    
+    # boundbox
+    bnds = bounds(ob)
+
+    bnds_min = (bnds.x.min, bnds.y.min)
+    bnds_max = (bnds.x.max, bnds.y.max)
+    
+    bnd_width = math.fabs(bnds.x.max - bnds.x.min)
+    bnd_height = math.fabs(bnds.z.max - bnds.z.min)
+    bnd_depth = math.fabs(bnds.y.max - bnds.y.min)
+
+    file.write(struct.pack('fff', bnd_width, bnd_height, bnd_depth))
+    
+    # section data  
+    width_sections = max(1, math.ceil(bnd_width / 10))
+    depth_sections = max(1, math.ceil(bnd_depth / 10))
+    height_sections = 1
+    
+    total_sections = width_sections * height_sections * depth_sections
+    individual_section_width = (1 / width_sections) * bnd_width
+    individual_section_depth = (1 / depth_sections) * bnd_depth
+    
+    file.write(struct.pack('LLLL', width_sections, height_sections, depth_sections, total_sections))
+    
+    #calculate intersecting polygons + poly indices
+    poly_indices = 0
+    section_groups = []
+    
+    for d in range(depth_sections):
+      for w in reversed(range(width_sections)):
+        BOUNDS_INFLATION = 0.1
+        
+        section_bnds_min = ((bnds_min[0] + (w * individual_section_width)) - BOUNDS_INFLATION, (bnds_min[1] + (d * individual_section_depth)) - BOUNDS_INFLATION)
+        section_bnds_max = ((bnds_min[0] + ((w + 1) * individual_section_width)) + BOUNDS_INFLATION, (bnds_min[1] + ((d + 1) * individual_section_depth)) + BOUNDS_INFLATION)
+        
+        section_edges = []
+        section_edges.append(((section_bnds_min[0], section_bnds_min[1]), (section_bnds_max[0], section_bnds_min[1])))
+        section_edges.append(((section_bnds_max[0], section_bnds_min[1]), (section_bnds_max[0], section_bnds_max[1])))
+        section_edges.append(((section_bnds_min[0], section_bnds_max[1]), (section_bnds_max[0], section_bnds_max[1])))
+        section_edges.append(((section_bnds_min[0], section_bnds_min[1]), (section_bnds_min[0], section_bnds_max[1])))
+        
+        section_group = []
+        section_poly = [(section_bnds_min[0], section_bnds_min[1]), (section_bnds_max[0], section_bnds_min[1]), (section_bnds_max[0], section_bnds_max[1]), (section_bnds_min[0], section_bnds_max[1])]
+        
+        for f in bm.faces:
+          # quick bounds check
+          face_2d = []
+          for loop in f.loops:
+            face_2d.append((loop.vert.co[0], loop.vert.co[1])) 
+          
+          face_min = [9999, 9999]
+          face_max = [-9999, -9999]
+          for pt in face_2d:
+            face_min[1] = min(face_min[1], pt[1])
+            face_min[0] = min(face_min[0], pt[0])
+            face_max[1] = max(face_max[1], pt[1])
+            face_max[0] = max(face_max[0], pt[0])
+          if not bounds_intersect(face_min, face_max, section_bnds_min, section_bnds_max):
+            continue
+          
+          # slower edges check
+          isect = False
+          for edge in f.edges:
+            if isect:
+                break
+                
+            v0_3d = edge.verts[0]
+            v1_3d = edge.verts[1]
+            v0 = (v0_3d.co[0], v0_3d.co[1])
+            v1 = (v1_3d.co[0], v1_3d.co[1])
+            
+            isect |= point_in_bounds(section_bnds_min, section_bnds_max, v0)
+            isect |= point_in_bounds(section_bnds_min, section_bnds_max, v1)
+            
+            # check if the face surrounds this polygon
+            if not isect:
+                for p in section_poly:
+                    isect |= point_in_polygon(p, face_2d)
+                    if isect:
+                        break
+            
+            # more expensive edge-edge intersect testing (only if edge is not vertical)
+            edge_is_vertical = v0[0] == v1[0] and v0[1] == v1[1]
+            if not isect and not edge_is_vertical:
+                for se in section_edges:
+                    isect |= edges_intersect(se[0], se[1], v0, v1)
+                    if isect:
+                        break
+            
+          if isect:
+            section_group.append(f.index)
+            poly_indices += 1
+        
+        section_groups.append(section_group)
+        
+    # continue writing more binary information about boxes and stuff
+    file.write(struct.pack('L', poly_indices))
+    
+    if bnd_width == 0:
+      file.write(struct.pack('f', float('Inf')))
+    else:
+      file.write(struct.pack('f', width_sections / bnd_width))
+      
+    file.write(struct.pack('f', 1))
+      
+    if bnd_depth == 0:
+      file.write(struct.pack('f', float('Inf')))
+    else:
+      file.write(struct.pack('f', depth_sections / bnd_depth))
+      
+    file.write(struct.pack('ffffff',  -bnds.x.max, bnds.z.min, bnds.y.min, -bnds.x.min, bnds.z.max ,bnds.y.max))
+    
+    # write index info
+    tot_ind = 0
+    for i in range(total_sections):
+      file.write(struct.pack('H', tot_ind))
+      tot_ind += len(section_groups[i])
+
+    for i in range(total_sections):
+      file.write(struct.pack('H', len(section_groups[i])))
+      
+    for i in range(total_sections):
+      for j in range(len(section_groups[i])):
+          file.write(struct.pack('H', section_groups[i][j]))
+      
+        
+    # finish off
+    bm.free()
+    file.close()
+    return
+    
 def export_binary_bound(file, ob):
     # create temp mesh
     temp_mesh = None
@@ -282,6 +408,7 @@ def export_bound(file, ob):
 ######################################################
 def save_bnd(filepath,
              export_binary,
+             export_terrain,
              context):
 
     print("exporting BOUND: %r..." % (filepath))
@@ -306,10 +433,10 @@ def save_bnd(filepath,
       binfile = open(filepath[:-3] + "bbnd", 'wb')
       export_binary_bound(binfile, bound_obj)
     
-    #if export_terrain:
-    #  # write TER
-    #  terfile = open(filepath[:-3] + "ter", 'wb')
-    #  export_terrain_bound(terfile, bound_obj)
+    if export_terrain:
+      # write TER
+      terfile = open(filepath[:-3] + "ter", 'wb')
+      export_terrain_bound(terfile, bound_obj)
       
     # bound export complete
     print(" done in %.4f sec." % (time.clock() - time1))
@@ -319,6 +446,7 @@ def save(operator,
          context,
          filepath="",
          export_binary=False,
+         export_terrain=False,
          apply_modifiers=False
          ):
     
@@ -337,6 +465,7 @@ def save(operator,
     # save BND
     save_bnd(filepath,
              export_binary,
+             export_terrain,
              context,
              )
 
