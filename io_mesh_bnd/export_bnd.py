@@ -163,6 +163,18 @@ def poly_debug(poly1, color=(0,0,0)):
   scn.objects.link(curveOB)
   return curveOB
 
+
+def write_binary_material(file, name):
+    write_char_array(file, name, 32)
+    file.write(struct.pack('ff', 0.1, 0.5))
+    write_char_array(file, 'none', 32)
+    write_char_array(file, 'none', 32)
+    
+
+def make_ascii_material(name):
+    return "mtl " + name + " {\n\telasticity: 0.100000\n\tfriction: 0.500000\n\teffect: none\n\tsound: none\n}\n"
+
+
 ######################################################
 # EXPORT MAIN FILES
 ######################################################
@@ -188,23 +200,23 @@ def export_binary_bound(file, ob):
     for v in bm.verts:
         file.write(struct.pack('fff', v.co[0], v.co[2], v.co[1] * -1))
 
-
     # materials
-    for ms in ob.material_slots:
-        mat = ms.material
-        write_char_array(file, get_undupe_name(mat.name), 32)
-        file.write(struct.pack('ff', 0.1, 0.5))
-        write_char_array(file, 'none', 32)
-        write_char_array(file, 'none', 32)
-        
+    num_materials = len(ob.material_slots)
+    if num_materials > 0:
+        for ms in ob.material_slots:
+            mat = ms.material
+            write_binary_material(file, get_undupe_name(mat.name))
+    else:
+        write_binary_material(file, "default")
 
     # faces
     bm.verts.index_update()
     for fcs in bm.faces:
+        material_index = max(0, fcs.material_index)
         if len(fcs.loops) == 3:
-            file.write(struct.pack('HHHHH', fcs.loops[0].vert.index, fcs.loops[1].vert.index, fcs.loops[2].vert.index, 0, fcs.material_index))
+            file.write(struct.pack('HHHHH', fcs.loops[0].vert.index, fcs.loops[1].vert.index, fcs.loops[2].vert.index, 0, material_index))
         elif len(fcs.loops) == 4:
-            file.write(struct.pack('HHHHH', fcs.loops[0].vert.index, fcs.loops[1].vert.index, fcs.loops[2].vert.index, fcs.loops[3].vert.index, fcs.material_index))
+            file.write(struct.pack('HHHHH', fcs.loops[0].vert.index, fcs.loops[1].vert.index, fcs.loops[2].vert.index, fcs.loops[3].vert.index, material_index))
     
     # finish off
     bm.free()
@@ -236,19 +248,24 @@ def export_bound(file, ob):
     bnd_file += "\n"
 
     # materials
-    for ms in ob.material_slots:
-        mat = ms.material
-        bnd_file += "mtl " + get_undupe_name(mat.name) + " {\n\telasticity: 0.100000\n\tfriction: 0.500000\n\teffect: none\n\tsound: none\n}\n"
+    num_materials = len(ob.material_slots)
+    if num_materials > 0:
+        for ms in ob.material_slots:
+            mat = ms.material
+            bnd_file += make_ascii_material(get_undupe_name(mat.name))
+    else:
+        bnd_file += make_ascii_material("default")
         
     bnd_file += "\n"
 
     # faces
     bm.verts.index_update()
     for fcs in bm.faces:
+        material_index = max(0, fcs.material_index)
         if len(fcs.loops) == 3:
-            bnd_file += "tri " + str(fcs.loops[0].vert.index) + "  " + str(fcs.loops[1].vert.index) + "  " + str(fcs.loops[2].vert.index) + "  " + str(fcs.material_index) + "\n"
+            bnd_file += "tri " + str(fcs.loops[0].vert.index) + "  " + str(fcs.loops[1].vert.index) + "  " + str(fcs.loops[2].vert.index) + "  " + str(material_index) + "\n"
         elif len(fcs.loops) == 4:
-            bnd_file += "quad " + str(fcs.loops[0].vert.index) + "  " + str(fcs.loops[1].vert.index) + "  " + str(fcs.loops[2].vert.index) + "  " + str(fcs.loops[3].vert.index) + "  " + str(fcs.material_index) + "\n"
+            bnd_file += "quad " + str(fcs.loops[0].vert.index) + "  " + str(fcs.loops[1].vert.index) + "  " + str(fcs.loops[2].vert.index) + "  " + str(fcs.loops[3].vert.index) + "  " + str(material_index) + "\n"
             
     # write BOUND
     file.write(bnd_file)
