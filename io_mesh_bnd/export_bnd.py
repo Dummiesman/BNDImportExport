@@ -3,7 +3,7 @@
 # This program is licensed under Creative Commons BY-NC-SA:
 # https://creativecommons.org/licenses/by-nc-sa/3.0/
 #
-# Copyright (C) Dummiesman, 2016
+# Created by Dummiesman, 2016-2020
 #
 # ##### END LICENSE BLOCK #####
 
@@ -234,6 +234,7 @@ def export_terrain_bound(file, ob):
         face_max[1] = max(face_max[1], pt[1])
         face_max[0] = max(face_max[0], pt[0])
       
+      # check each section to see if the face is contained
       for section in ter_sections:
         section_bnds_min = section.bounds[0]
         section_bnds_max = section.bounds[1]
@@ -355,7 +356,14 @@ def export_binary_bound(file, ob):
         if len(fcs.loops) == 3:
             file.write(struct.pack('HHHHH', fcs.loops[0].vert.index, fcs.loops[1].vert.index, fcs.loops[2].vert.index, 0, material_index))
         elif len(fcs.loops) == 4:
-            file.write(struct.pack('HHHHH', fcs.loops[0].vert.index, fcs.loops[1].vert.index, fcs.loops[2].vert.index, fcs.loops[3].vert.index, material_index))
+            indices = [fcs.loops[0].vert.index, fcs.loops[1].vert.index, fcs.loops[2].vert.index, fcs.loops[3].vert.index]
+            
+            # last index can't be 0 in a quad, so shift this polygon around if that's the case
+            if indices[3] == 0:
+                indices_copy = indices.copy()
+                indices = [indices_copy[3], indices_copy[0], indices_copy[1], indices_copy[2]]
+            
+            file.write(struct.pack('HHHHH', indices[0], indices[1], indices[2], indices[3], material_index))
     
     # finish off
     bm.free()
