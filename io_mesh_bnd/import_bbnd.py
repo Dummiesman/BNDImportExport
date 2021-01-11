@@ -12,10 +12,22 @@ import time, struct
 
 import io_mesh_bnd.common_helpers as helper
 
+def make_empty_at_position(name, position):
+    # setup object
+    ob = bpy.data.objects.new(name, None)
+
+    # set matrix
+    ob.location = position
+    ob.show_name = True
+    
+    scn = bpy.context.scene
+    scn.collection.objects.link(ob)
+
+
 ######################################################
 # IMPORT MAIN FILES
 ######################################################
-def read_bbnd_file(file):
+def read_bbnd_file(file, bound_repair_debug):
     scn = bpy.context.scene
     # add a mesh and link it to the scene
     me = bpy.data.meshes.new('BoundMesh')
@@ -36,8 +48,15 @@ def read_bbnd_file(file):
         raise Exception('BBND file is wrong version.')
     
     num_verts, num_materials, num_faces = struct.unpack('3L', file.read(12))
+    first_vertex = True
     for i in range(num_verts):
         vertex = struct.unpack('<fff', file.read(12))
+
+        if first_vertex:
+            if bound_repair_debug:
+                make_empty_at_position("FirstVertex", (vertex[0] * -1, vertex[2], vertex[1]))
+            first_vertex = False
+            
         bm.verts.new((vertex[0] * -1, vertex[2], vertex[1]))
         bm.verts.ensure_lookup_table()
     
@@ -83,8 +102,9 @@ def read_bbnd_file(file):
 ######################################################
 # IMPORT
 ######################################################
-def load_bnd(filepath,
-             context):
+def load_bbnd(filepath,
+             context,
+             bound_repair_debug):
 
     print("importing BBND: %r..." % (filepath))
 
@@ -95,7 +115,7 @@ def load_bnd(filepath,
     file = open(filepath, 'rb')
 
     # start reading our bbnd file
-    read_bbnd_file(file)
+    read_bbnd_file(file, bound_repair_debug)
 
     print(" done in %.4f sec." % (time.clock() - time1))
     file.close()
@@ -104,10 +124,12 @@ def load_bnd(filepath,
 def load(operator,
          context,
          filepath="",
+         bound_repair_debug = False,
          ):
 
-    load_bnd(filepath,
+    load_bbnd(filepath,
              context,
+             bound_repair_debug,
              )
 
     return {'FINISHED'}
