@@ -3,44 +3,18 @@
 # This program is licensed under Creative Commons BY-NC-SA:
 # https://creativecommons.org/licenses/by-nc-sa/3.0/
 #
-# Copyright (C) Dummiesman, 2016
+# Created by Dummiesman, 2016-2020
 #
 # ##### END LICENSE BLOCK #####
 
 import bpy, bmesh
 import time
 
-# material color list
-material_colors = {
-                    'grass': (0, 0.507, 0.005),
-                    'cobblestone': (0.040, 0.040, 0.040),
-                    'default': (1, 1, 1),
-                    'wood': (0.545, 0.27, 0.074),
-                    'dirt': (0.545, 0.35, 0.168),
-                    'mud': (0.345, 0.25, 0.068),
-                    'sand': (1, 0.78, 0.427),
-                    'water': (0.20, 0.458, 0.509),
-                    'deepwater': (0.15, 0.408, 0.459),
-                  }
+import io_mesh_bnd.common_helpers as helper
 
 ######################################################
 # IMPORT MAIN FILES
 ######################################################
-def create_material(name):
-    name_l = name.lower()
-    
-    # get color
-    material_color = (1,1,1)
-    if name_l in material_colors:
-      material_color = material_colors[name_l]
-      
-    #setup material
-    mtl = bpy.data.materials.new(name=name_l)
-    mtl.diffuse_color = material_color
-    mtl.specular_intensity = 0
-    
-    return mtl
-    
 def read_bnd_file(file):
     scn = bpy.context.scene
     # add a mesh and link it to the scene
@@ -50,8 +24,8 @@ def read_bnd_file(file):
     bm = bmesh.new()
     bm.from_mesh(me)
     
-    scn.objects.link(ob)
-    scn.objects.active = ob
+    scn.collection.objects.link(ob)
+    bpy.context.view_layer.objects.active = ob
     
     bpy.ops.object.mode_set(mode='EDIT', toggle=False)
     
@@ -67,11 +41,11 @@ def read_bnd_file(file):
       # not an empty line, read it!
       if cmps[0] == "v":
         # vertex
-        bm.verts.new((float(cmps[1]), float(cmps[3]) * -1, float(cmps[2])))
+        bm.verts.new((float(cmps[1]) * -1, float(cmps[3]), float(cmps[2])))
         bm.verts.ensure_lookup_table()
       elif cmps[0] == "mtl":
         # material
-        ob.data.materials.append(create_material(cmps[1]))
+        ob.data.materials.append(helper.create_material(cmps[1]))
       elif cmps[0] == "quad" or cmps[0] == "tri":
         face = None
         num_indices = 4 if cmps[0] == "quad" else 3
@@ -116,7 +90,7 @@ def load_bnd(filepath,
     time1 = time.clock()
     file = open(filepath, 'r')
 
-    # start reading our pkg file
+    # start reading our bnd file
     read_bnd_file(file)
 
     print(" done in %.4f sec." % (time.clock() - time1))
