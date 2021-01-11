@@ -354,6 +354,7 @@ def export_binary_bound(file, ob):
 def export_bound(file, ob):
     # create temp mesh
     temp_mesh = None
+    global apply_modifiers_G
     if apply_modifiers_G:
         dg = bpy.context.evaluated_depsgraph_get()
         eval_obj = ob.evaluated_get(dg)
