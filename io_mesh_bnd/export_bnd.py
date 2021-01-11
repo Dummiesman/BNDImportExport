@@ -12,6 +12,8 @@ import os.path as path
 
 import bpy, bmesh, mathutils
 
+from io_mesh_bnd.ter_section import TerSection
+
 # globals
 global apply_modifiers_G
 apply_modifiers_G = True
@@ -199,42 +201,58 @@ def export_terrain_bound(file, ob):
     
     #calculate intersecting polygons + poly indices
     poly_indices = 0
-    section_groups = []
+    ter_sections = []
     
+    # create sections structures
     for d in range(depth_sections):
       for w in reversed(range(width_sections)):
         BOUNDS_INFLATION = 0.1
         
         section_bnds_min = ((bnds_min[0] + (w * individual_section_width)) - BOUNDS_INFLATION, (bnds_min[1] + (d * individual_section_depth)) - BOUNDS_INFLATION)
         section_bnds_max = ((bnds_min[0] + ((w + 1) * individual_section_width)) + BOUNDS_INFLATION, (bnds_min[1] + ((d + 1) * individual_section_depth)) + BOUNDS_INFLATION)
+
+        section_edges = (((section_bnds_min[0], section_bnds_min[1]), (section_bnds_max[0], section_bnds_min[1])), ((section_bnds_max[0], section_bnds_min[1]), (section_bnds_max[0], section_bnds_max[1])),
+                         ((section_bnds_min[0], section_bnds_max[1]), (section_bnds_max[0], section_bnds_max[1])), ((section_bnds_min[0], section_bnds_min[1]), (section_bnds_min[0], section_bnds_max[1])))
+        section_poly = ((section_bnds_min[0], section_bnds_min[1]), (section_bnds_max[0], section_bnds_min[1]), (section_bnds_max[0], section_bnds_max[1]), (section_bnds_min[0], section_bnds_max[1]))
+       
+        #TerSection(self, bounds_min, bounds_max, edges, polygon):
+        ter_section = TerSection(section_bnds_min, section_bnds_max, section_edges, section_poly)
+        ter_sections.append(ter_section)
+    
+    # loop through faces and find faces in each section
+    for f in bm.faces:
+      # compute bounds
+      face_2d = []
+      for loop in f.loops:
+        face_2d.append((loop.vert.co[0], loop.vert.co[1])) 
+      
+      face_min = [9999, 9999]
+      face_max = [-9999, -9999]
+      for pt in face_2d:
+        face_min[1] = min(face_min[1], pt[1])
+        face_min[0] = min(face_min[0], pt[0])
+        face_max[1] = max(face_max[1], pt[1])
+        face_max[0] = max(face_max[0], pt[0])
+      
+      for section in ter_sections:
+        section_bnds_min = section.bounds[0]
+        section_bnds_max = section.bounds[1]
         
-        section_edges = []
-        section_edges.append(((section_bnds_min[0], section_bnds_min[1]), (section_bnds_max[0], section_bnds_min[1])))
-        section_edges.append(((section_bnds_max[0], section_bnds_min[1]), (section_bnds_max[0], section_bnds_max[1])))
-        section_edges.append(((section_bnds_min[0], section_bnds_max[1]), (section_bnds_max[0], section_bnds_max[1])))
-        section_edges.append(((section_bnds_min[0], section_bnds_min[1]), (section_bnds_min[0], section_bnds_max[1])))
-        
-        section_group = []
-        section_poly = [(section_bnds_min[0], section_bnds_min[1]), (section_bnds_max[0], section_bnds_min[1]), (section_bnds_max[0], section_bnds_max[1]), (section_bnds_min[0], section_bnds_max[1])]
-        
-        for f in bm.faces:
-          # quick bounds check
-          face_2d = []
-          for loop in f.loops:
-            face_2d.append((loop.vert.co[0], loop.vert.co[1])) 
+        if not bounds_intersect(face_min, face_max, section_bnds_min, section_bnds_max):
+          continue
           
-          face_min = [9999, 9999]
-          face_max = [-9999, -9999]
-          for pt in face_2d:
-            face_min[1] = min(face_min[1], pt[1])
-            face_min[0] = min(face_min[0], pt[0])
-            face_max[1] = max(face_max[1], pt[1])
-            face_max[0] = max(face_max[0], pt[0])
-          if not bounds_intersect(face_min, face_max, section_bnds_min, section_bnds_max):
-            continue
-          
-          # slower edges check
-          isect = False
+        isect = False
+        
+        # face checks
+        # check if this polygon surrounds this section
+        section_poly = section.polygon
+        for p in section_poly:
+          isect |= point_in_polygon(p, face_2d)
+          if isect:
+            break
+              
+        # edge checks
+        if not isect:
           for edge in f.edges:
             if isect:
                 break
@@ -247,26 +265,18 @@ def export_terrain_bound(file, ob):
             isect |= point_in_bounds(section_bnds_min, section_bnds_max, v0)
             isect |= point_in_bounds(section_bnds_min, section_bnds_max, v1)
             
-            # check if the face surrounds this polygon
-            if not isect:
-                for p in section_poly:
-                    isect |= point_in_polygon(p, face_2d)
-                    if isect:
-                        break
-            
             # more expensive edge-edge intersect testing (only if edge is not vertical)
             edge_is_vertical = v0[0] == v1[0] and v0[1] == v1[1]
             if not isect and not edge_is_vertical:
+                section_edges = section.edges
                 for se in section_edges:
                     isect |= edges_intersect(se[0], se[1], v0, v1)
                     if isect:
                         break
             
-          if isect:
-            section_group.append(f.index)
-            poly_indices += 1
-        
-        section_groups.append(section_group)
+        if isect:
+          section.group.append(f.index)
+          poly_indices += 1
         
     # continue writing more binary information about boxes and stuff
     file.write(struct.pack('L', poly_indices))
@@ -288,17 +298,19 @@ def export_terrain_bound(file, ob):
     # write index info
     tot_ind = 0
     for i in range(total_sections):
+      section_group = ter_sections[i].group
       file.write(struct.pack('H', tot_ind))
-      tot_ind += len(section_groups[i])
+      tot_ind += len(section_group)
 
     for i in range(total_sections):
-      file.write(struct.pack('H', len(section_groups[i])))
+      section_group = ter_sections[i].group
+      file.write(struct.pack('H', len(section_group)))
       
     for i in range(total_sections):
-      for j in range(len(section_groups[i])):
-          file.write(struct.pack('H', section_groups[i][j]))
+      section_group = ter_sections[i].group
+      for j in range(len(section_group)):
+          file.write(struct.pack('H', section_group[j]))
       
-        
     # finish off
     bm.free()
     file.close()
