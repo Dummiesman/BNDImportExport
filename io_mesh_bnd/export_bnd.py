@@ -22,7 +22,6 @@ apply_modifiers_G = True
 # EXPORT HELPERS
 ######################################################
 def bounds(obj):
-
     local_coords = obj.bound_box[:]
     om = obj.matrix_world
     coords = [p[:] for p in local_coords]
@@ -59,40 +58,7 @@ def write_char_array(file, w_str, length):
     file.write(bytes(w_str, 'utf-8'))
     file.write(bytes('\x00' * (length - len(w_str )), 'utf-8'))
 
-def lerp(fr,to,t):
-   return fr + (to - fr) * t
 
-def vec_distance(v1, v2):
-  nx = v2[0] - v1[0]
-  ny = v2[1] - v1[1]
-  return math.sqrt(nx * nx + ny * ny )
-   
-def poly_overlap_test(pl1, otl, ttc):
-  #calculate center of otl
-  otl_centerx = 0
-  otl_centery = 0
-  for p in otl:
-    otl_centerx += p[0]
-    otl_centery += p[1]
-  otl_centerx /= len(otl)
-  otl_centery /= len(otl)
-  
-  pl1.append(pl1[len(pl1) - 1])  
-  for p1 in range(len(pl1) - 1):
-    edge = (pl1[p1], pl1[p1+1])
-    for et in range(11):
-      et_prcnt = et/10
-      lx = lerp(edge[0][0], edge[1][0], et_prcnt)
-      ly = lerp(edge[0][1], edge[1][1], et_prcnt)
-      if vec_distance((lx,ly), (otl_centerx, otl_centery)) < ttc:
-        return True
-  return False
-  
-def point_in_box(point, box):
-  if box[0][0] <= point[0] and point[0] <= box[2][0] and box[0][1] <= point[1] and point[1] <= box[2][1]:
-    return True
-  return False
-  
 def point_in_polygon(p, vertices):
     n = len(vertices)
     inside =False
