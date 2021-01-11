@@ -8,14 +8,14 @@
 # ##### END LICENSE BLOCK #####
 
 import bpy, bmesh
-import time
+import time, struct
 
 import io_mesh_bnd.common_helpers as helper
 
 ######################################################
 # IMPORT MAIN FILES
 ######################################################
-def read_bnd_file(file):
+def read_bbnd_file(file):
     scn = bpy.context.scene
     # add a mesh and link it to the scene
     me = bpy.data.meshes.new('BoundMesh')
@@ -29,44 +29,48 @@ def read_bnd_file(file):
     
     bpy.ops.object.mode_set(mode='EDIT', toggle=False)
     
-    # read in BND file!
-    for raw_line in file.readlines():
-      # get line components
-      cmps = raw_line.lower().split()
-      
-      # empty line?
-      if len(cmps) < 2:
-        continue
-      
-      # not an empty line, read it!
-      if cmps[0] == "v":
-        # vertex
-        bm.verts.new((float(cmps[1]) * -1, float(cmps[3]), float(cmps[2])))
+    # read in BBND file!
+    bbnd_version = file.read(1)[0]
+    if bbnd_version != 1:
+        file.close()
+        raise Exception('BBND file is wrong version.')
+    
+    num_verts, num_materials, num_faces = struct.unpack('3L', file.read(12))
+    for i in range(num_verts):
+        vertex = struct.unpack('<fff', file.read(12))
+        bm.verts.new((vertex[0] * -1, vertex[2], vertex[1]))
         bm.verts.ensure_lookup_table()
-      elif cmps[0] == "mtl":
-        # material
-        ob.data.materials.append(helper.create_material(cmps[1]))
-      elif cmps[0] == "quad" or cmps[0] == "tri":
-        face = None
-        num_indices = 4 if cmps[0] == "quad" else 3
+    
+    for i in range(num_materials):
+        # read name (32 chars), and remove non nulled junk, and skip the rest of the material data
+        material_name_bytes = bytearray(file.read(32))
+        file.seek(72, 1)
+        for b in range(len(material_name_bytes)):
+          if material_name_bytes[b] > 126:
+            material_name_bytes[b] = 0
         
-        # create face
-        if num_indices == 4:
+        # make material
+        material_name = material_name_bytes.decode("utf-8").rstrip('\x00')
+        ob.data.materials.append(helper.create_material(material_name))
+        
+    for i in range(num_faces):
+        index0, index1, index2, index3, material_index = struct.unpack('<HHHHH', file.read(10))
+        if index3 == 0:
           try:
-            face = bm.faces.new((bm.verts[int(cmps[1])], bm.verts[int(cmps[2])], bm.verts[int(cmps[3])], bm.verts[int(cmps[4])]))
+            face = bm.faces.new((bm.verts[index0], bm.verts[index1], bm.verts[index2]))
           except Exception as e:
             print(str(e))
-        if num_indices == 3:
+        else:
           try:
-            face = bm.faces.new((bm.verts[int(cmps[1])], bm.verts[int(cmps[2])], bm.verts[int(cmps[3])]))
+            face = bm.faces.new((bm.verts[index0], bm.verts[index1], bm.verts[index2], bm.verts[index3]))
           except Exception as e:
             print(str(e))
         
         # set smooth/material
         if face is not None:
-          face.material_index = int(cmps[num_indices+1])
+          face.material_index = material_index
           face.smooth = True
-    
+          
     # calculate normals
     bm.normal_update()
     
@@ -82,16 +86,16 @@ def read_bnd_file(file):
 def load_bnd(filepath,
              context):
 
-    print("importing BND: %r..." % (filepath))
+    print("importing BBND: %r..." % (filepath))
 
     if bpy.ops.object.select_all.poll():
         bpy.ops.object.select_all(action='DESELECT')
 
     time1 = time.clock()
-    file = open(filepath, 'r')
+    file = open(filepath, 'rb')
 
-    # start reading our bnd file
-    read_bnd_file(file)
+    # start reading our bbnd file
+    read_bbnd_file(file)
 
     print(" done in %.4f sec." % (time.clock() - time1))
     file.close()

@@ -36,7 +36,7 @@ from bpy_extras.io_utils import (
 class ImportBND(bpy.types.Operator, ImportHelper):
     """Import from BND file format (.bnd)"""
     bl_idname = "import_scene.bnd"
-    bl_label = 'Import BND'
+    bl_label = 'Import Bound'
     bl_options = {'UNDO'}
 
     filename_ext = ".bnd"
@@ -51,6 +51,26 @@ class ImportBND(bpy.types.Operator, ImportHelper):
                                             ))
 
         return import_bnd.load(self, context, **keywords)
+
+
+class ImportBBND(bpy.types.Operator, ImportHelper):
+    """Import from BBND file format (.bbnd)"""
+    bl_idname = "import_scene.bbnd"
+    bl_label = 'Import Binary Bound'
+    bl_options = {'UNDO'}
+
+    filename_ext = ".bbnd"
+    filter_glob: StringProperty(default="*.bbnd", options={'HIDDEN'})
+
+    def execute(self, context):
+        from . import import_bbnd
+        keywords = self.as_keywords(ignore=("axis_forward",
+                                            "axis_up",
+                                            "filter_glob",
+                                            "check_existing",
+                                            ))
+
+        return import_bbnd.load(self, context, **keywords)
 
 
 class ExportBND(bpy.types.Operator, ExportHelper):
@@ -108,14 +128,17 @@ class ExportBND(bpy.types.Operator, ExportHelper):
 def menu_func_export(self, context):
     self.layout.operator(ExportBND.bl_idname, text="Angel Studios Bound (.bnd)")
 
-
-def menu_func_import(self, context):
+def menu_func_import_bnd(self, context):
     self.layout.operator(ImportBND.bl_idname, text="Angel Studios Bound (.bnd)")
+    
+def menu_func_import_bbnd(self, context):
+    self.layout.operator(ImportBBND.bl_idname, text="Angel Studios Binary Bound (.bbnd)")
 
 
 # Register factories
 classes = (
     ImportBND,
+    ImportBBND,
     ExportBND
 )
 
@@ -123,12 +146,14 @@ def register():
     for cls in classes:
         bpy.utils.register_class(cls)
 
-    bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
+    bpy.types.TOPBAR_MT_file_import.append(menu_func_import_bnd)
+    bpy.types.TOPBAR_MT_file_import.append(menu_func_import_bbnd)
     bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
 
 
 def unregister():
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
+    bpy.types.TOPBAR_MT_file_import.remove(menu_func_import_bbnd)
     bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
     
     for cls in reversed(classes):
