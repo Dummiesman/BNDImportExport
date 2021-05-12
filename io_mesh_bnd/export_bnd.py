@@ -297,18 +297,21 @@ def export_binary_bound(file, ob):
     # get bmesh
     bm = bmesh.new()
     bm.from_mesh(temp_mesh)
-
+    
+    real_num_materials = len(ob.material_slots)
+    num_materials = max(real_num_materials, 1)
+    
     # header
     file.write(struct.pack('B', 1))
-    file.write(struct.pack('LLL', len(bm.verts), len(ob.material_slots), len(bm.faces)))
+    file.write(struct.pack('LLL', len(bm.verts), num_materials, len(bm.faces)))
     
     # vertices
     for v in bm.verts:
         file.write(struct.pack('fff', v.co[0] * -1, v.co[2], v.co[1]))
 
     # materials
-    num_materials = len(ob.material_slots)
-    if num_materials > 0:
+    
+    if real_num_materials > 0:
         for ms in ob.material_slots:
             mat = ms.material
             write_binary_material(file, get_undupe_name(mat.name))
@@ -352,8 +355,11 @@ def export_bound(file, ob):
     bm = bmesh.new()
     bm.from_mesh(temp_mesh)
 
+    real_num_materials = len(ob.material_slots)
+    num_materials = max(real_num_materials, 1)
+    
     # header
-    bnd_file = "version: 1.01\nverts: " + str(len(bm.verts)) + "\nmaterials: " + str(len(ob.material_slots)) + "\nedges: 0\npolys: " + str(len(bm.faces)) + "\n\n"
+    bnd_file = "version: 1.01\nverts: " + str(len(bm.verts)) + "\nmaterials: " + str(num_materials) + "\nedges: 0\npolys: " + str(len(bm.faces)) + "\n\n"
 
     # vertices
     for v in bm.verts:
@@ -362,8 +368,7 @@ def export_bound(file, ob):
     bnd_file += "\n"
 
     # materials
-    num_materials = len(ob.material_slots)
-    if num_materials > 0:
+    if real_num_materials > 0:
         for ms in ob.material_slots:
             mat = ms.material
             bnd_file += make_ascii_material(get_undupe_name(mat.name))
