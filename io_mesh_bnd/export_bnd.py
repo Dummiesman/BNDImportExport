@@ -408,7 +408,7 @@ def save_bnd(filepath,
     if bpy.ops.object.select_all.poll():
         bpy.ops.object.select_all(action='DESELECT')
 
-    time1 = time.clock()
+    time1 = time.perf_counter()
     
 
     # find bound object
@@ -431,7 +431,7 @@ def save_bnd(filepath,
       export_terrain_bound(terfile, bound_obj)
       
     # bound export complete
-    print(" done in %.4f sec." % (time.clock() - time1))
+    print(" done in %.4f sec." % (time.perf_counter() - time1))
 
 
 def save(operator,

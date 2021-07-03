@@ -87,13 +87,13 @@ def load_bnd(filepath,
     if bpy.ops.object.select_all.poll():
         bpy.ops.object.select_all(action='DESELECT')
 
-    time1 = time.clock()
+    time1 = time.perf_counter()
     file = open(filepath, 'r')
 
     # start reading our bnd file
     read_bnd_file(file)
 
-    print(" done in %.4f sec." % (time.clock() - time1))
+    print(" done in %.4f sec." % (time.perf_counter() - time1))
     file.close()
 
 
