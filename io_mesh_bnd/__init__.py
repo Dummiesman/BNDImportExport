@@ -175,7 +175,7 @@ def register():
 
 
 def unregister():
-    bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
+    bpy.types.TOPBAR_MT_file_import.remove(menu_func_import_bnd)
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import_bbnd)
     bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
     
