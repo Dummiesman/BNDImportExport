@@ -97,7 +97,7 @@ class ImportBBND(bpy.types.Operator, ImportHelper):
 
 
 class ExportBND(bpy.types.Operator, ExportHelper):
-    """Export to PKG file format (.BND)"""
+    """Export to BND file format (.BND)"""
     bl_idname = "export_scene.bnd"
     bl_label = 'Export BND'
 
