@@ -1,4 +1,7 @@
-Blender BND Add-On
+# Archived - No longer updated !!
+This plugin has been merged with https://github.com/Dummiesman/AngelStudiosBlenderAddon
+
+## Blender BND Add-On
 Version 1.0
 January 11th 2021
 
